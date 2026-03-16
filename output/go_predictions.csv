@@ -1,0 +1,21 @@
+protein,GO_term,GO_name,score
+Protein1,GO:1901701,cellular response to oxygen-containing compound,0.7056481242179871
+Protein1,GO:0003677,DNA binding,0.6856418251991272
+Protein1,GO:1990756,ubiquitin-like ligase-substrate adaptor activity,0.6698947548866272
+Protein1,GO:0016740,transferase activity,0.6642897129058838
+Protein1,GO:0030163,protein catabolic process,0.6619590520858765
+Protein1,GO:0007163,establishment or maintenance of cell polarity,0.6439208984375
+Protein1,GO:0038023,signaling receptor activity,0.6432133316993713
+Protein1,GO:1902680,positive regulation of RNA biosynthetic process,0.6226207613945007
+Protein1,GO:0008277,regulation of G protein-coupled receptor signaling pathway,0.6114799976348877
+Protein1,GO:0048471,perinuclear region of cytoplasm,0.6056600213050842
+Protein2,GO:0030239,myofibril assembly,0.6727727055549622
+Protein2,GO:0043161,proteasome-mediated ubiquitin-dependent protein catabolic process,0.6368120312690735
+Protein2,GO:0016567,protein ubiquitination,0.6293566226959229
+Protein2,GO:1901135,carbohydrate derivative metabolic process,0.6283749938011169
+Protein2,GO:0045931,positive regulation of mitotic cell cycle,0.6227487325668335
+Protein2,GO:0003016,respiratory system process,0.6182118058204651
+Protein2,GO:0043167,ion binding,0.6032193899154663
+Protein2,GO:0051491,positive regulation of filopodium assembly,0.5788652896881104
+Protein2,GO:0005654,nucleoplasm,0.5769078731536865
+Protein2,GO:0004930,G protein-coupled receptor activity,0.5752615332603455
