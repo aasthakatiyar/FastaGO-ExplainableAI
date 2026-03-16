@@ -6,9 +6,9 @@ from tensorflow.keras.models import load_model
 from Bio import SeqIO
 from io import StringIO
 
-# -----------------------------------
+# ------------------------------
 # CONFIG
-# -----------------------------------
+# ------------------------------
 
 MAXLEN = 2000
 TOP_K = 10
@@ -18,11 +18,11 @@ TERMS_PATH = "data/terms.pkl"
 GO_OBO_PATH = "data/go.obo"
 
 AA = "ACDEFGHIKLMNPQRSTVWY"
-AA_INDEX = {a:i for i,a in enumerate(AA)}
+AA_INDEX = {a: i for i, a in enumerate(AA)}
 
-# -----------------------------------
+# ------------------------------
 # PAGE CONFIG
-# -----------------------------------
+# ------------------------------
 
 st.set_page_config(
     page_title="Protein Function Predictor",
@@ -30,39 +30,34 @@ st.set_page_config(
     layout="wide"
 )
 
-# -----------------------------------
-# STYLING
-# -----------------------------------
+# ------------------------------
+# STYLE
+# ------------------------------
 
 st.markdown("""
 <style>
-.big-title {
-    font-size:38px;
-    font-weight:700;
+.title{
+font-size:40px;
+font-weight:700;
 }
-.subtitle {
-    font-size:18px;
-    color:gray;
-}
-.result-box {
-    background-color:#f5f7fa;
-    padding:15px;
-    border-radius:10px;
+.subtitle{
+font-size:18px;
+color:gray;
 }
 </style>
 """, unsafe_allow_html=True)
 
-# -----------------------------------
+# ------------------------------
 # LOAD MODEL
-# -----------------------------------
+# ------------------------------
 
 @st.cache_resource
 def load_model_cached():
     return load_model(MODEL_PATH)
 
-# -----------------------------------
+# ------------------------------
 # LOAD GO TERMS
-# -----------------------------------
+# ------------------------------
 
 @st.cache_data
 def load_go_terms():
@@ -75,10 +70,9 @@ def load_go_terms():
 
     return terms
 
-
-# -----------------------------------
+# ------------------------------
 # LOAD GO NAMES
-# -----------------------------------
+# ------------------------------
 
 @st.cache_data
 def load_go_names():
@@ -99,10 +93,9 @@ def load_go_names():
 
     return go_names
 
-
-# -----------------------------------
-# ENCODING
-# -----------------------------------
+# ------------------------------
+# ENCODE SEQUENCE
+# ------------------------------
 
 def encode(seq):
 
@@ -117,29 +110,9 @@ def encode(seq):
 
     return arr
 
-
-# -----------------------------------
-# PARSE FASTA
-# -----------------------------------
-
-def read_fasta(uploaded_file):
-
-    fasta_string = uploaded_file.getvalue().decode()
-
-    sequences = []
-    names = []
-
-    for record in SeqIO.parse(StringIO(fasta_string),"fasta"):
-
-        names.append(record.id)
-        sequences.append(str(record.seq))
-
-    return names, sequences
-
-
-# -----------------------------------
-# PREDICTION
-# -----------------------------------
+# ------------------------------
+# RUN PREDICTION
+# ------------------------------
 
 def run_prediction(names, seqs):
 
@@ -153,87 +126,128 @@ def run_prediction(names, seqs):
 
     preds = model.predict(X)
 
-    results = []
+    rows = []
 
     for i,name in enumerate(names):
 
         scores = preds[i]
-
         top = np.argsort(scores)[::-1][:TOP_K]
 
         for idx in top:
 
             go_id = go_terms[idx]
 
-            results.append({
-
-                "Protein":name,
-                "GO ID":go_id,
-                "GO Name":go_names.get(go_id,"Unknown"),
-                "Score":float(scores[idx])
-
+            rows.append({
+                "Protein": name,
+                "GO Term": go_id,
+                "GO Name": go_names.get(go_id,"Unknown"),
+                "Score": float(scores[idx])
             })
 
-    return pd.DataFrame(results)
+    return pd.DataFrame(rows)
 
+# ------------------------------
+# SAMPLE SEQUENCES
+# ------------------------------
 
-# -----------------------------------
-# UI
-# -----------------------------------
+SAMPLES = {
+"Insulin": "MALWMRLLPLLALLALWGPDPAAA",
+"Cytochrome C": "MGDVEKGKKIFIMKCSQCHTVEKGGKHKTGPNE",
+"Hemoglobin": "MVLSPADKTNVKAAWGKVGAHAGEYGAEALERMF",
+"Myoglobin": "GLSDGEWQQVLNVWGKVEADIPGHGQEVLIRLF",
+"Lysozyme": "KVFGRCELAAAMKRHGLDNYRGYSLGNWVCAAK",
+"Albumin": "MKWVTFISLLFLFSSAYS"
+}
 
-st.markdown('<div class="big-title">🧬 Protein Function Prediction</div>', unsafe_allow_html=True)
+# ------------------------------
+# HEADER
+# ------------------------------
 
-st.markdown('<div class="subtitle">Deep learning based Gene Ontology prediction</div>', unsafe_allow_html=True)
+st.markdown('<div class="title">🧬 Protein Function Prediction</div>', unsafe_allow_html=True)
+st.markdown('<div class="subtitle">Deep Learning based Gene Ontology Annotation</div>', unsafe_allow_html=True)
 
 st.write("")
 
-# -----------------------------------
-# FILE UPLOAD
-# -----------------------------------
+# ------------------------------
+# TABS
+# ------------------------------
 
-uploaded = st.file_uploader(
-    "Upload FASTA file",
-    type=["fa","fasta","txt"]
-)
+tab1, tab2, tab3 = st.tabs(["Upload FASTA", "Paste Sequence", "Sample Proteins"])
 
-if uploaded:
+# ------------------------------
+# TAB 1 — FASTA UPLOAD
+# ------------------------------
 
-    names, seqs = read_fasta(uploaded)
+with tab1:
 
-    st.success(f"{len(names)} sequences loaded")
+    uploaded = st.file_uploader("Upload FASTA file", type=["fa","fasta","txt"])
 
-    with st.expander("Preview sequences"):
+    if uploaded:
 
-        for i in range(min(5,len(names))):
+        fasta_string = uploaded.getvalue().decode()
 
-            st.write(names[i])
-            st.code(seqs[i][:120]+"...")
+        names = []
+        seqs = []
 
-    if st.button("Run Prediction 🚀"):
+        for record in SeqIO.parse(StringIO(fasta_string),"fasta"):
 
-        with st.spinner("Running DeepGOPlus model..."):
+            names.append(record.id)
+            seqs.append(str(record.seq))
+
+        st.success(f"{len(names)} sequences loaded")
+
+        if st.button("Predict Functions"):
+
+            with st.spinner("Running model..."):
+
+                df = run_prediction(names,seqs)
+
+            st.dataframe(df, use_container_width=True)
+
+            st.download_button(
+                "Download CSV",
+                df.to_csv(index=False),
+                "predictions.csv"
+            )
+
+# ------------------------------
+# TAB 2 — MANUAL INPUT
+# ------------------------------
+
+with tab2:
+
+    seq = st.text_area("Paste amino acid sequence")
+
+    if st.button("Predict Sequence"):
+
+        if seq:
+
+            names = ["Manual_Sequence"]
+            seqs = [seq.replace("\n","").strip()]
+
+            with st.spinner("Running model..."):
+
+                df = run_prediction(names,seqs)
+
+            st.dataframe(df, use_container_width=True)
+
+# ------------------------------
+# TAB 3 — SAMPLE PROTEINS
+# ------------------------------
+
+with tab3:
+
+    sample = st.selectbox("Choose sample protein", list(SAMPLES.keys()))
+
+    st.code(SAMPLES[sample])
+
+    if st.button("Run Sample Prediction"):
+
+        names = [sample]
+        seqs = [SAMPLES[sample]]
+
+        with st.spinner("Running model..."):
 
             df = run_prediction(names,seqs)
 
-        st.success("Prediction completed!")
-
-        # -----------------------------------
-        # DISPLAY RESULTS
-        # -----------------------------------
-
-        st.subheader("Predicted Gene Ontology Terms")
-
         st.dataframe(df, use_container_width=True)
-
-        # -----------------------------------
-        # DOWNLOAD
-        # -----------------------------------
-
-        csv = df.to_csv(index=False).encode()
-
-        st.download_button(
-            "Download Results CSV",
-            csv,
-            "go_predictions.csv",
-            "text/csv"
-        )
