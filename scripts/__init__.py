@@ -1,0 +1,1 @@
+"""FastaGO-ExplainableAI scripts package."""

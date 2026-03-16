@@ -1,0 +1,33 @@
+# Configuration for FastaGO-ExplainableAI
+# Adjust paths and URLs as needed.
+
+# Local paths (relative to project root)
+paths:
+  uniprot_fasta: "databases/uniprot/uniprot_sprot.fasta"
+  uniprot_dmnd: "databases/uniprot/uniprot.dmnd"
+  pfam_hmm: "databases/pfam/Pfam-A.hmm"
+  go_obo: "databases/go/go-basic.obo"
+  goa_gaf: "databases/go/goa_uniprot_sprot.gaf.gz"
+  pfam2go: "databases/go/pfam2go"
+  output_dir: "output"
+  logs_dir: "logs"
+
+# Remote download sources
+urls:
+  uniprot_sprot_fasta: "https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_sprot.fasta.gz"
+  pfam_a_hmm: "https://ftp.ebi.ac.uk/pub/databases/Pfam/releases/Pfam35.0/Pfam-A.hmm.gz"
+  go_obo: "http://purl.obolibrary.org/obo/go/go-basic.obo"
+  goa_uniprot: "https://ftp.ebi.ac.uk/pub/databases/GO/goa/UNIPROT/goa_uniprot_all.gaf.gz"
+  pfam2go: "https://current.geneontology.org/ontology/external2go/pfam2go"
+
+# External tools
+tools:
+  diamond: "tools/diamond.exe"
+
+# Pipeline settings
+pipeline:
+  diamond_evalue: 1e-5
+  diamond_max_targets: 20
+  hmmer_evalue: 1e-5
+  top_hits: 10
+  log_level: "INFO"
