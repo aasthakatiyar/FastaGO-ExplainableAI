@@ -1,21 +1,16 @@
 protein,GO_term,GO_name,score
-sp|P99999|CYC_HUMAN,GO:1901701,cellular response to oxygen-containing compound,0.7716
-sp|P99999|CYC_HUMAN,GO:0048471,perinuclear region of cytoplasm,0.735
-sp|P99999|CYC_HUMAN,GO:0003677,DNA binding,0.7218
-sp|P99999|CYC_HUMAN,GO:0016740,transferase activity,0.7141
-sp|P99999|CYC_HUMAN,GO:0030163,protein catabolic process,0.7063
-sp|P99999|CYC_HUMAN,GO:0009725,response to hormone,0.6594
-sp|P99999|CYC_HUMAN,GO:1990756,ubiquitin-like ligase-substrate adaptor activity,0.657
-sp|P99999|CYC_HUMAN,GO:0021700,developmental maturation,0.6453
-sp|P99999|CYC_HUMAN,GO:0022414,reproductive process,0.635
-sp|P99999|CYC_HUMAN,GO:0007369,gastrulation,0.6204
-sp|P99999|CYC_HUMAN,GO:0031344,regulation of cell projection organization,0.598
-sp|P99999|CYC_HUMAN,GO:0033646,host intracellular part,0.589
-sp|P99999|CYC_HUMAN,GO:0009416,response to light stimulus,0.5765
-sp|P99999|CYC_HUMAN,GO:0030030,cell projection organization,0.5697
-sp|P99999|CYC_HUMAN,GO:0055044,symplast,0.5611
-sp|P99999|CYC_HUMAN,GO:0019865,immunoglobulin binding,0.561
-sp|P99999|CYC_HUMAN,GO:0045732,positive regulation of protein catabolic process,0.5553
-sp|P99999|CYC_HUMAN,GO:0048609,multicellular organismal reproductive process,0.5375
-sp|P99999|CYC_HUMAN,GO:0043167,ion binding,0.5201
-sp|P99999|CYC_HUMAN,GO:0019207,kinase regulator activity,0.5174
+sp|P99999|CYC_HUMAN,GO:0008150,biological_process,0.7444
+sp|P99999|CYC_HUMAN,GO:0009987,cellular process,0.6771
+sp|P99999|CYC_HUMAN,GO:0003674,molecular_function,0.6674
+sp|P99999|CYC_HUMAN,GO:0005575,cellular_component,0.653
+sp|P99999|CYC_HUMAN,GO:0110165,cellular anatomical structure,0.65
+sp|P99999|CYC_HUMAN,GO:0005622,intracellular anatomical structure,0.6159
+sp|P99999|CYC_HUMAN,GO:0003824,catalytic activity,0.611
+sp|P99999|CYC_HUMAN,GO:0043226,organelle,0.5895
+sp|P99999|CYC_HUMAN,GO:0043229,intracellular organelle,0.5868
+sp|P99999|CYC_HUMAN,GO:0016020,membrane,0.5787
+sp|P99999|CYC_HUMAN,GO:0008152,metabolic process,0.5713
+sp|P99999|CYC_HUMAN,GO:0044238,primary metabolic process,0.5629
+sp|P99999|CYC_HUMAN,GO:0043227,membrane-bounded organelle,0.5467
+sp|P99999|CYC_HUMAN,GO:0005737,cytoplasm,0.5296
+sp|P99999|CYC_HUMAN,GO:0043231,intracellular membrane-bounded organelle,0.5059
