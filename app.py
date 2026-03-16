@@ -1,131 +1,197 @@
 import streamlit as st
-import pandas as pd
 import numpy as np
+import pandas as pd
+import os
+import io
 from tensorflow.keras.models import load_model
 from Bio import SeqIO
-import io
-import plotly.express as px
-from utils import encode_sequence, load_go_terms, load_go_names
+from utils import encode_sequence, load_go_terms, load_go_metadata, MAXLEN
 
-# --- MODERN STYLING ---
-st.set_page_config(page_title="DeepGO-Horizon", page_icon="🧪", layout="wide")
+# --- CONFIGURATION ---
+MODEL_PATH = "model/model.h5"
+TERMS_PATH = "data/terms.pkl"
+GO_OBO_PATH = "data/go.obo"
 
-st.markdown("""
-    <style>
-    .main { background-color: #0e1117; }
-    .stMetric { background-color: #161b22; padding: 15px; border-radius: 10px; border: 1px solid #30363d; }
-    .stButton>button { width: 100%; border-radius: 20px; background: linear-gradient(45deg, #00f2fe 0%, #4facfe 100%); color: white; border: none; font-weight: bold; }
-    .stTextInput>div>div>input { background-color: #161b22; color: #58a6ff; }
-    </style>
-    """, unsafe_allow_html=True)
+# --- PAGE SETUP ---
+st.set_page_config(
+    page_title="DeepGOPlus Predictor",
+    page_icon="🧬",
+    layout="wide"
+)
 
 # --- CACHE ASSETS ---
 @st.cache_resource
-def get_model():
-    return load_model("model/model.h5")
+def load_assets():
+    if not os.path.exists(MODEL_PATH):
+        return None, None, None
+    model = load_model(MODEL_PATH)
+    go_terms = load_go_terms(TERMS_PATH)
+    go_meta = load_go_metadata(GO_OBO_PATH)
+    return model, go_terms, go_meta
 
-@st.cache_data
-def get_metadata():
-    return load_go_terms("data/terms.pkl"), load_go_names("data/go.obo")
-
-# --- APP HEADER ---
-st.title("🧪 DeepGO Horizon")
-st.markdown("#### *Next-Generation Protein Function Annotation*")
-st.divider()
-
-# --- INPUT SECTION ---
-col_in, col_set = st.columns([2, 1])
-
-with col_set:
-    st.header("⚙️ Parameters")
-    with st.container(border=True):
-        threshold = st.slider("Confidence Threshold", 0.0, 1.0, 0.3)
-        top_k = st.number_input("Max Terms per Protein", 5, 50, 12)
-        model_version = st.caption("Engine: DeepGOPlus-v1 (5707 Sync)")
-
-with col_in:
-    st.header("🧬 Sequence Input")
-    input_mode = st.tabs(["📄 Upload File", "⌨️ Manual Text", "💡 Sample Input"])
+# --- SAMPLE DATA ---
+SAMPLE_SEQUENCES = {
+    "Human p53 Tumor Suppressor": """>sp|P04637|P53_HUMAN Cellular tumor antigen p53 OS=Homo sapiens
+MEEPQSDPSVEPPLSQETFSDLWKLLPENNVLSPLPSQAMDDLMLSPDDIEQWFTEDPGP
+DEAPRMPEAAPPVAPAPAAPTPAAPAPAPSWPLSSSVPSQKTYQGSYGFRLGFLHSGTAK""",
     
-    input_fasta = None
+    "SARS-CoV-2 Spike Protein": """>sp|P0DTC2|SPIKE_SARS2 Spike glycoprotein OS=Severe acute respiratory syndrome coronavirus 2
+MFVFLVLLPLVSSQCVNLTTRTQLPPAYTNSFTRGVYYPDKVFRSSVLHSTQDLFLPFFS
+NVTWFHAIHVSGTNGTKRFDNPVLPFNDGVYFASTEKSNIIRGWIFGTTLDSKTQSLLIVM""",
+    
+    "Insulin-like Growth Factor": """>sp|P05019|IGF1_HUMAN Insulin-like growth factor 1
+MSSSVPTPSLFLPAQPLLPLLLPLLQLPAQPLLLPQPAPEVLANEPVTYSSSPWGRGPQG"""
+}
 
-    with input_mode[0]:
-        uploaded_file = st.file_uploader("Drop FASTA file here", type=["fasta", "fa"])
+# --- MAIN APP ---
+def main():
+    # 1. Load Model
+    model, go_terms, go_meta = load_assets()
+    
+    if model is None:
+        st.error("⚠️ **Model files not found.** Please check the following paths:")
+        st.code(f"- {MODEL_PATH}\n- {TERMS_PATH}\n- {GO_OBO_PATH}")
+        st.stop()
+
+    # 2. Sidebar
+    with st.sidebar:
+        st.title("⚙️ Settings")
+        threshold = st.slider(
+            "Confidence Threshold", 
+            min_value=0.0, max_value=1.0, value=0.3, step=0.05
+        )
+        top_k = st.number_input(
+            "Max Terms per Protein", 
+            min_value=1, max_value=30, value=10
+        )
+        st.markdown("---")
+        st.markdown("### About")
+        st.info("DeepGOPlus predicts Gene Ontology terms from protein sequences using Deep Learning.")
+
+    # 3. Main Area
+    st.title("🧬 DeepGOPlus Predictor")
+    st.write("Upload a file, enter a sequence, or select a sample below to predict protein functions.")
+
+    # --- INPUT SECTION (TABS) ---
+    tab1, tab2, tab3 = st.tabs(["📤 Upload File", "✍️ Input Sequence", "🧪 Sample Data"])
+
+    input_sequences = []
+    source_name = ""
+
+    # TAB 1: UPLOAD
+    with tab1:
+        uploaded_file = st.file_uploader("Upload FASTA file", type=["fasta", "fa", "txt"])
         if uploaded_file:
-            input_fasta = uploaded_file.getvalue().decode("utf-8")
+            content = uploaded_file.getvalue().decode("utf-8")
+            for rec in SeqIO.parse(io.StringIO(content), "fasta"):
+                input_sequences.append((rec.id, str(rec.seq)))
+            source_name = uploaded_file.name
 
-    with input_mode[1]:
-        text_input = st.text_area("Paste Amino Acid Sequence", height=150, placeholder=">Protein_ID\nMGDVEKGKKIFIM...")
-        if text_input:
-            input_fasta = text_input
-
-    with input_mode[2]:
-        if st.button("Load Cytochrome C (Human) Sample"):
-            input_fasta = ">sp|P99999|CYC_HUMAN\nMGDVEKGKKIFIMKCSQCHTVEKGGKHKTGPNLHGLFGRKTGQAPGYSYTAANKNKGIIWGEDTLMEYLENPKKYIPGTKMIFVGIKKKEERADLIAYLKKATNE"
-            st.info("Sample Loaded!")
-
-# --- EXECUTION ---
-if input_fasta:
-    if st.button("🚀 ANALYZE SEQUENCE"):
-        with st.spinner("Decoding biological patterns..."):
-            # Prepare Data
-            fasta_io = io.StringIO(input_fasta)
-            records = list(SeqIO.parse(fasta_io, "fasta"))
+    # TAB 2: MANUAL INPUT
+    with tab2:
+        user_input = st.text_area(
+            "Paste sequence (FASTA format allowed)", 
+            height=150,
+            placeholder=">protein_id\nMTEITAAM..."
+        )
+        if user_input.strip():
+            # Add header if missing
+            clean_text = user_input.strip()
+            if not clean_text.startswith(">"):
+                clean_text = ">user_input\n" + clean_text
             
-            if not records:
-                st.error("Format Error: Ensure input is in FASTA format (starts with '>')")
-            else:
-                # Load Assets
-                model = get_model()
-                go_terms, go_names = get_metadata()
-                
-                # Predict
-                ids = [r.id for r in records]
-                X = np.array([encode_sequence(str(r.seq)) for r in records])
-                preds = model.predict(X)
-                
-                # Process
-                all_results = []
-                for i, protein_id in enumerate(ids):
-                    scores = preds[i]
-                    valid_idx = np.where(scores >= threshold)[0]
-                    sorted_idx = valid_idx[np.argsort(scores[valid_idx])[::-1]]
-                    
-                    for idx in sorted_idx[:top_k]:
-                        go_id = go_terms[idx]
-                        all_results.append({
-                            "Protein": protein_id,
-                            "GO_ID": go_id,
-                            "Function_Name": go_names.get(go_id, "Unknown"),
-                            "Confidence": round(float(scores[idx]), 4)
-                        })
-                
-                res_df = pd.DataFrame(all_results)
+            for rec in SeqIO.parse(io.StringIO(clean_text), "fasta"):
+                input_sequences.append((rec.id, str(rec.seq)))
+            source_name = "Manual Input"
 
-                if not res_df.empty:
-                    st.divider()
-                    st.success("Analysis Complete")
-                    
-                    # Layout Results
-                    res_col, viz_col = st.columns([1, 1])
-                    
-                    with res_col:
-                        st.subheader("📋 Prediction Table")
-                        st.dataframe(res_df, use_container_width=True, hide_index=True)
-                        st.download_button("📥 Export Results (CSV)", res_df.to_csv(index=False), "deepgo_results.csv")
-                    
-                    with viz_col:
-                        st.subheader("📊 Functional Distribution")
-                        # Modern chart styling
-                        fig = px.bar(res_df.head(top_k), x="Confidence", y="Function_Name", 
-                                     orientation='h', color='Confidence',
-                                     color_continuous_scale='Turbo')
-                        fig.update_layout(
-                            paper_bgcolor='rgba(0,0,0,0)',
-                            plot_bgcolor='rgba(0,0,0,0)',
-                            font_color="#58a6ff",
-                            yaxis={'categoryorder':'total ascending'}
-                        )
-                        st.plotly_chart(fig, use_container_width=True)
-                else:
-                    st.warning("No significant functions detected above the threshold.")
+    # TAB 3: SAMPLES
+    with tab3:
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            selected_sample = st.selectbox("Choose a sample protein", list(SAMPLE_SEQUENCES.keys()))
+        with col2:
+            st.write("") # Align button
+            load_btn = st.button("Load Sample")
+
+        st.code(SAMPLE_SEQUENCES[selected_sample], language="text")
+
+        if load_btn:
+            for rec in SeqIO.parse(io.StringIO(SAMPLE_SEQUENCES[selected_sample]), "fasta"):
+                input_sequences.append((rec.id, str(rec.seq)))
+            source_name = selected_sample
+
+    # --- PREDICTION ENGINE ---
+    if input_sequences:
+        st.markdown("---")
+        
+        # Show status
+        with st.status("Processing...", expanded=True) as status:
+            st.write(f"Loading {len(input_sequences)} sequence(s)...")
+            
+            # Preprocess
+            ids, encoded_seqs = [], []
+            for pid, seq in input_sequences:
+                ids.append(pid)
+                encoded_seqs.append(encode_sequence(seq))
+            
+            st.write("Running model...")
+            preds = model.predict(np.array(encoded_seqs), verbose=0)
+            
+            status.update(label="Prediction Complete!", state="complete")
+
+        # Process Results
+        results = []
+        for i, pid in enumerate(ids):
+            scores = preds[i]
+            valid_idx = np.where(scores >= threshold)[0]
+            sorted_idx = valid_idx[np.argsort(scores[valid_idx])[::-1]]
+            
+            for idx in sorted_idx[:top_k]:
+                go_id = go_terms[idx]
+                go_info = go_meta.get(go_id, {})
+                results.append({
+                    "Protein": pid,
+                    "GO Term": go_id,
+                    "Name": go_info.get("name", "N/A"),
+                    "Namespace": go_info.get("namespace", ""),
+                    "Definition": go_info.get("def", ""),
+                    "Synonyms": ", ".join(go_info.get("synonyms", [])),
+                    "Alt IDs": ", ".join(go_info.get("alt_id", [])),
+                    "Replaced By": ", ".join(go_info.get("replaced_by", [])),
+                    "Obsolete": go_info.get("is_obsolete", False),
+                    "Score": scores[idx]
+                })
+
+        if results:
+            df = pd.DataFrame(results)
+            
+            # Display Metrics
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Proteins Analyzed", len(ids))
+            c2.metric("Total Terms Found", len(df))
+            c3.metric("Average Score", f"{df['Score'].mean():.2f}")
+
+            # Display Table
+            st.dataframe(
+                df,
+                use_container_width=True,
+                column_config={
+                    "Score": st.column_config.ProgressColumn(
+                        "Score", format="%.2f", min_value=0, max_value=1
+                    )
+                }
+            )
+
+            # Download
+            csv = df.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="📥 Download Results as CSV",
+                data=csv,
+                file_name=f"predictions_{source_name}.csv",
+                mime="text/csv"
+            )
+        else:
+            st.warning("No terms found above the threshold. Try lowering the threshold in the sidebar.")
+
+if __name__ == "__main__":
+    main()

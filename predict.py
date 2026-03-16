@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 from tensorflow.keras.models import load_model
 from Bio import SeqIO
-from utils import encode_sequence, load_go_terms, load_go_names, MAXLEN
+from utils import encode_sequence, load_go_terms, load_go_metadata, MAXLEN
 
 # --- CONFIGURATION ---
 MODEL_PATH = "model/model.h5"
@@ -28,7 +28,7 @@ def main():
     print("Loading model and metadata...")
     model = load_model(MODEL_PATH)
     go_terms = load_go_terms(TERMS_PATH)
-    go_names = load_go_names(GO_OBO_PATH)
+    go_meta = load_go_metadata(GO_OBO_PATH)
 
     # 3. Process Sequences
     ids, encoded_seqs = [], []
@@ -55,10 +55,17 @@ def main():
         
         for idx in sorted_idx[:TOP_K]:
             go_id = go_terms[idx]
+            go_info = go_meta.get(go_id, {})
             results.append({
                 "protein": protein_id,
                 "GO_term": go_id,
-                "GO_name": go_names.get(go_id, "Unknown"),
+                "GO_name": go_info.get("name", "Unknown"),
+                "GO_namespace": go_info.get("namespace", ""),
+                "GO_definition": go_info.get("def", ""),
+                "GO_synonyms": ", ".join(go_info.get("synonyms", [])),
+                "GO_alt_ids": ", ".join(go_info.get("alt_id", [])),
+                "GO_replaced_by": ", ".join(go_info.get("replaced_by", [])),
+                "GO_obsolete": go_info.get("is_obsolete", False),
                 "score": round(float(scores[idx]), 4)
             })
 
