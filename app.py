@@ -1,244 +1,239 @@
 import streamlit as st
 import numpy as np
 import pandas as pd
+import pickle
 from tensorflow.keras.models import load_model
 from Bio import SeqIO
-import io
-import time
+from io import StringIO
 
-# Constants
+# -----------------------------------
+# CONFIG
+# -----------------------------------
+
 MAXLEN = 2000
-AA = "ACDEFGHIKLMNPQRSTVWY"
-AA_INDEX = {a: i for i, a in enumerate(AA)}
+TOP_K = 10
 
-# Page configuration
+MODEL_PATH = "model/model.h5"
+TERMS_PATH = "data/terms.pkl"
+GO_OBO_PATH = "data/go.obo"
+
+AA = "ACDEFGHIKLMNPQRSTVWY"
+AA_INDEX = {a:i for i,a in enumerate(AA)}
+
+# -----------------------------------
+# PAGE CONFIG
+# -----------------------------------
+
 st.set_page_config(
-    page_title="DeepGOPlus Protein Function Predictor",
+    page_title="Protein Function Predictor",
     page_icon="🧬",
     layout="wide"
 )
 
-# Title and description
-st.title("🧬 DeepGOPlus Protein Function Predictor")
+# -----------------------------------
+# STYLING
+# -----------------------------------
+
 st.markdown("""
-This app uses DeepGOPlus, a deep learning model for predicting Gene Ontology (GO) terms from protein sequences.
-Upload a FASTA file or enter protein sequences directly to get function predictions.
-""")
+<style>
+.big-title {
+    font-size:38px;
+    font-weight:700;
+}
+.subtitle {
+    font-size:18px;
+    color:gray;
+}
+.result-box {
+    background-color:#f5f7fa;
+    padding:15px;
+    border-radius:10px;
+}
+</style>
+""", unsafe_allow_html=True)
 
-# Load model (cached)
+# -----------------------------------
+# LOAD MODEL
+# -----------------------------------
+
 @st.cache_resource
-def load_prediction_model():
-    """Load the DeepGOPlus model"""
-    try:
-        model = load_model("model/model.h5")
-        return model
-    except Exception as e:
-        st.error(f"Error loading model: {e}")
-        return None
+def load_model_cached():
+    return load_model(MODEL_PATH)
 
-# Sequence encoding function
-def encode_sequence(seq):
-    """Encode a protein sequence into one-hot format"""
-    arr = np.zeros((MAXLEN, 21))
+# -----------------------------------
+# LOAD GO TERMS
+# -----------------------------------
 
-    for i, aa in enumerate(seq[:MAXLEN]):
+@st.cache_data
+def load_go_terms():
+
+    with open(TERMS_PATH, "rb") as f:
+        terms = pickle.load(f)
+
+    if isinstance(terms, pd.DataFrame):
+        terms = terms.iloc[:,0].tolist()
+
+    return terms
+
+
+# -----------------------------------
+# LOAD GO NAMES
+# -----------------------------------
+
+@st.cache_data
+def load_go_names():
+
+    go_names = {}
+    current = None
+
+    with open(GO_OBO_PATH) as f:
+
+        for line in f:
+
+            if line.startswith("id:"):
+                current = line.strip().split()[1]
+
+            elif line.startswith("name:"):
+                name = line.strip()[6:]
+                go_names[current] = name
+
+    return go_names
+
+
+# -----------------------------------
+# ENCODING
+# -----------------------------------
+
+def encode(seq):
+
+    arr = np.zeros((MAXLEN,21))
+
+    for i,aa in enumerate(seq[:MAXLEN]):
+
         if aa in AA_INDEX:
-            arr[i, AA_INDEX[aa]] = 1
+            arr[i,AA_INDEX[aa]] = 1
         else:
-            arr[i, 20] = 1  # unknown AA
+            arr[i,20] = 1
 
     return arr
 
-# Parse FASTA from text
-def parse_fasta_text(fasta_text):
-    """Parse FASTA sequences from text input"""
+
+# -----------------------------------
+# PARSE FASTA
+# -----------------------------------
+
+def read_fasta(uploaded_file):
+
+    fasta_string = uploaded_file.getvalue().decode()
+
     sequences = []
     names = []
 
-    try:
-        # Use StringIO to create a file-like object
-        fasta_io = io.StringIO(fasta_text)
-        for record in SeqIO.parse(fasta_io, "fasta"):
-            names.append(record.id)
-            sequences.append(encode_sequence(str(record.seq)))
-    except Exception as e:
-        st.error(f"Error parsing FASTA: {e}")
-        return [], []
+    for record in SeqIO.parse(StringIO(fasta_string),"fasta"):
+
+        names.append(record.id)
+        sequences.append(str(record.seq))
 
     return names, sequences
 
-# Main prediction function
-def predict_protein_functions(model, sequences, names):
-    """Run predictions on protein sequences"""
-    if not sequences:
-        return None
 
-    X = np.array(sequences)
+# -----------------------------------
+# PREDICTION
+# -----------------------------------
 
-    # Show progress
-    with st.spinner("Running predictions... This may take a few moments."):
-        preds = model.predict(X, verbose=0)
+def run_prediction(names, seqs):
 
-    # Create DataFrame
-    df = pd.DataFrame(preds)
-    df.insert(0, "protein", names)
+    model = load_model_cached()
+    go_terms = load_go_terms()
+    go_names = load_go_names()
 
-    return df
+    encoded = [encode(s) for s in seqs]
 
-# Sidebar for inputs
-st.sidebar.header("Input Options")
+    X = np.array(encoded)
 
-input_method = st.sidebar.radio(
-    "Choose input method:",
-    ["Enter FASTA text", "Upload FASTA file"]
+    preds = model.predict(X)
+
+    results = []
+
+    for i,name in enumerate(names):
+
+        scores = preds[i]
+
+        top = np.argsort(scores)[::-1][:TOP_K]
+
+        for idx in top:
+
+            go_id = go_terms[idx]
+
+            results.append({
+
+                "Protein":name,
+                "GO ID":go_id,
+                "GO Name":go_names.get(go_id,"Unknown"),
+                "Score":float(scores[idx])
+
+            })
+
+    return pd.DataFrame(results)
+
+
+# -----------------------------------
+# UI
+# -----------------------------------
+
+st.markdown('<div class="big-title">🧬 Protein Function Prediction</div>', unsafe_allow_html=True)
+
+st.markdown('<div class="subtitle">Deep learning based Gene Ontology prediction</div>', unsafe_allow_html=True)
+
+st.write("")
+
+# -----------------------------------
+# FILE UPLOAD
+# -----------------------------------
+
+uploaded = st.file_uploader(
+    "Upload FASTA file",
+    type=["fa","fasta","txt"]
 )
 
-fasta_text = ""
-uploaded_file = None
+if uploaded:
 
-if input_method == "Enter FASTA text":
-    fasta_text = st.sidebar.text_area(
-        "Enter protein sequences in FASTA format:",
-        height=200,
-        placeholder=">Protein1\nMKWVTFISLLFLFSSAYS\n\n>Protein2\nGGGSSVKVLVVVVGGGG",
-        help="Enter sequences in FASTA format with '>' headers"
-    )
-else:
-    uploaded_file = st.sidebar.file_uploader(
-        "Upload FASTA file:",
-        type=["fasta", "fa", "faa"],
-        help="Upload a FASTA file containing protein sequences"
-    )
+    names, seqs = read_fasta(uploaded)
 
-# Threshold slider
-threshold = st.sidebar.slider(
-    "Prediction Threshold:",
-    min_value=0.0,
-    max_value=1.0,
-    value=0.5,
-    step=0.05,
-    help="Only show predictions above this confidence threshold"
-)
+    st.success(f"{len(names)} sequences loaded")
 
-# Load model
-model = load_prediction_model()
+    with st.expander("Preview sequences"):
 
-if model is None:
-    st.error("Failed to load the prediction model. Please check that model/model.h5 exists.")
-    st.stop()
+        for i in range(min(5,len(names))):
 
-# Predict button
-if st.sidebar.button("🔍 Predict Functions", type="primary"):
-    # Get sequences
-    names = []
-    sequences = []
+            st.write(names[i])
+            st.code(seqs[i][:120]+"...")
 
-    if input_method == "Enter FASTA text" and fasta_text.strip():
-        names, sequences = parse_fasta_text(fasta_text)
-    elif input_method == "Upload FASTA file" and uploaded_file is not None:
-        try:
-            for record in SeqIO.parse(uploaded_file, "fasta"):
-                names.append(record.id)
-                sequences.append(encode_sequence(str(record.seq)))
-        except Exception as e:
-            st.error(f"Error reading uploaded file: {e}")
-    else:
-        st.sidebar.error("Please provide protein sequences using one of the input methods above.")
+    if st.button("Run Prediction 🚀"):
 
-    if names and sequences:
-        # Run predictions
-        results_df = predict_protein_functions(model, sequences, names)
+        with st.spinner("Running DeepGOPlus model..."):
 
-        if results_df is not None:
-            st.success(f"✅ Predictions completed for {len(names)} protein(s)!")
+            df = run_prediction(names,seqs)
 
-            # Store results in session state
-            st.session_state.results_df = results_df
-            st.session_state.names = names
+        st.success("Prediction completed!")
 
-# Display results
-if 'results_df' in st.session_state:
-    results_df = st.session_state.results_df
-    names = st.session_state.names
+        # -----------------------------------
+        # DISPLAY RESULTS
+        # -----------------------------------
 
-    st.header("📊 Prediction Results")
+        st.subheader("Predicted Gene Ontology Terms")
 
-    # Summary statistics
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("Proteins Analyzed", len(names))
-    with col2:
-        total_predictions = (results_df.iloc[:, 1:] > threshold).sum().sum()
-        st.metric("High-Confidence Predictions", total_predictions)
-    with col3:
-        avg_predictions = total_predictions / len(names)
-        st.metric("Avg Predictions per Protein", f"{avg_predictions:.1f}")
+        st.dataframe(df, use_container_width=True)
 
-    # Results table
-    st.subheader("Detailed Results")
+        # -----------------------------------
+        # DOWNLOAD
+        # -----------------------------------
 
-    # Filter predictions above threshold
-    filtered_df = results_df.copy()
+        csv = df.to_csv(index=False).encode()
 
-    # For each protein, keep only GO terms above threshold
-    go_columns = [col for col in filtered_df.columns if col != 'protein']
-
-    # Create a melted version for better display
-    melted_data = []
-    for idx, row in filtered_df.iterrows():
-        protein_name = row['protein']
-        for go_col in go_columns:
-            score = row[go_col]
-            if score >= threshold:
-                melted_data.append({
-                    'Protein': protein_name,
-                    'GO_Term_ID': f'GO_{go_col}',
-                    'Confidence_Score': score
-                })
-
-    if melted_data:
-        filtered_results = pd.DataFrame(melted_data)
-        filtered_results = filtered_results.sort_values(['Protein', 'Confidence_Score'], ascending=[True, False])
-
-        # Display as table
-        st.dataframe(
-            filtered_results,
-            use_container_width=True,
-            column_config={
-                'Protein': st.column_config.TextColumn('Protein', width='medium'),
-                'GO_Term_ID': st.column_config.TextColumn('GO Term', width='medium'),
-                'Confidence_Score': st.column_config.NumberColumn('Confidence Score', format='%.3f')
-            }
-        )
-
-        # Download button
-        csv_data = filtered_results.to_csv(index=False)
         st.download_button(
-            label="📥 Download Results as CSV",
-            data=csv_data,
-            file_name="protein_predictions.csv",
-            mime="text/csv"
+            "Download Results CSV",
+            csv,
+            "go_predictions.csv",
+            "text/csv"
         )
-    else:
-        st.info(f"No predictions found above the threshold of {threshold}. Try lowering the threshold.")
-
-    # Raw predictions (collapsible)
-    with st.expander("🔧 View Raw Predictions"):
-        st.dataframe(results_df, use_container_width=True)
-
-# Footer
-st.markdown("---")
-st.markdown("""
-**About DeepGOPlus:**
-DeepGOPlus is a deep learning model that predicts Gene Ontology (GO) terms for protein sequences.
-It uses convolutional neural networks trained on a large dataset of protein sequences and their annotated functions.
-
-**How to use:**
-1. Provide protein sequences in FASTA format
-2. Click "Predict Functions"
-3. Adjust the threshold to filter predictions
-4. Download results as CSV
-
-**Note:** GO term IDs are shown as GO_0, GO_1, etc. These correspond to specific Gene Ontology terms in the model's training data.
-""")</content>
-<parameter name="filePath">d:\Fasta GO\protein_prediction\app.py
