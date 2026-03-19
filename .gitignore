@@ -2,3 +2,4 @@
 model/model.h5
 .env
 .gemini_key
+data/*.pkl
