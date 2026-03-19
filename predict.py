@@ -56,17 +56,69 @@ def main():
         for idx in sorted_idx[:TOP_K]:
             go_id = go_terms[idx]
             go_info = go_meta.get(go_id, {})
+            
+            # Format relationships nicely
+            part_of_terms = []
+            other_relationships = []
+            for rel in go_info.get("relationship", []):
+                if "part_of" in rel:
+                    # Format: part_of GO:xxxxxxx ! name
+                    go_part = rel.split()[1] if len(rel.split()) > 1 else ""
+                    if go_part:
+                        part_of_terms.append(go_part)
+                else:
+                    other_relationships.append(rel)
+            
+            # Format subsets
+            subset_str = "; ".join(go_info.get("subset", []))
+            
+            # Format cross-references by database
+            xref_by_db = {}
+            for xref in go_info.get("xref", []):
+                if ":" in xref:
+                    db, ref = xref.split(":", 1)
+                    if db not in xref_by_db:
+                        xref_by_db[db] = []
+                    xref_by_db[db].append(ref.strip())
+            
+            xref_str = "; ".join([f"{db}: {', '.join(refs)}" for db, refs in xref_by_db.items()])
+            
             results.append({
+                # Protein and Prediction
                 "protein": protein_id,
+                "score": round(float(scores[idx]), 4),
+                
+                # GO Term Core Info
                 "GO_term": go_id,
                 "GO_name": go_info.get("name", "Unknown"),
                 "GO_namespace": go_info.get("namespace", ""),
                 "GO_definition": go_info.get("def", ""),
-                "GO_synonyms": ", ".join(go_info.get("synonyms", [])),
-                "GO_alt_ids": ", ".join(go_info.get("alt_id", [])),
-                "GO_replaced_by": ", ".join(go_info.get("replaced_by", [])),
+                
+                # Variations
+                "GO_synonyms": "; ".join(go_info.get("synonyms", [])),
+                "GO_alternate_IDs": "; ".join(go_info.get("alt_id", [])),
+                
+                # Hierarchy
+                "GO_parent_terms": "; ".join(go_info.get("is_a", [])),
+                "GO_part_of": "; ".join(part_of_terms),
+                
+                # Status & Alternatives
                 "GO_obsolete": go_info.get("is_obsolete", False),
-                "score": round(float(scores[idx]), 4)
+                "GO_replaced_by": "; ".join(go_info.get("replaced_by", [])),
+                "GO_consider": "; ".join(go_info.get("consider", [])),
+                
+                # External References
+                "GO_xref": xref_str,
+                
+                # Subset Information
+                "GO_subset": subset_str,
+                
+                # Additional Notes
+                "GO_comment": go_info.get("comment", ""),
+                
+                # Audit Information
+                "GO_created_by": go_info.get("created_by", ""),
+                "GO_creation_date": go_info.get("creation_date", ""),
             })
 
     # 6. Save

@@ -7,10 +7,13 @@ DeepGOPlus is a lightweight protein function prediction tool based on a deep lea
 ## ✅ Key Features
 
 - **Predicts GO terms** from protein sequences using a deep learning model (`model/model.h5`)
-- **Streamlit web UI** for interactive prediction and visualization (`app.py`)
-- **Command-line runner** for batch processing of FASTA files (`predict.py`)
+- **Comprehensive GO.obo Analysis**: Captures 100% of available metadata (xrefs, subsets, hierarchy, relationships)
+- **Interactive Web UI**: Streamlit-based UI with summary and detailed views (`app.py`)
+- **Batch Processing**: Command-line runner for large FASTA files (`predict.py`)
+- **Automated Reporting**: Generates ontology analysis reports (`analyze_ontology.py`)
+- **Multi-database Integration**: Links predictions to EC, KEGG, Reactome, RHEA, and more
 - Supports **multiple input modes** (file upload, manual paste, sample sequences)
-- Outputs **ranked GO terms with confidence scores**, plus option to download results
+- Outputs **enriched results** with full hierarchical context and external references
 
 ---
 

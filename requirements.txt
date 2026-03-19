@@ -1,7 +1,7 @@
-streamlit>=1.28.0
+streamlit
 tensorflow>=2.13.0,<2.16.0
 numpy>=1.21.0
 pandas>=1.3.0
 biopython>=1.79
-scikit-learn>=1.0.0</content>
-<parameter name="filePath">d:\Fasta GO\protein_prediction\requirements.txt
+scikit-learn>=1.0.0
+google-genai

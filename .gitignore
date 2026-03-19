@@ -1,2 +1,4 @@
-venv
+.venv
 model/model.h5
+.env
+.gemini_key
